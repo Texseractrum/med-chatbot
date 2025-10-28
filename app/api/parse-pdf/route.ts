@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
 
     // Use the responses API with structured output parsing
     const response = await openai.responses.parse({
-      model: 'gpt-5-2024-08-06',
+      model: 'gpt-5',
       input: [
         {
           role: 'system',

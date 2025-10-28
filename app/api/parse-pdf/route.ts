@@ -3,9 +3,17 @@ import OpenAI, { toFile } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set. Please add it to your environment variables.');
+  }
+  
+  return new OpenAI({
+    apiKey: apiKey,
+  });
+}
 
 // Define the Zod schema for medical guideline structure
 // Note: All fields must be required for OpenAI structured outputs
@@ -123,6 +131,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Get OpenAI client (with error handling)
+    const openai = getOpenAIClient();
 
     // Convert File to a format OpenAI accepts
     const bytes = await file.arrayBuffer();

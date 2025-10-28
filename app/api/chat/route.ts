@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { Guideline, DecisionResult } from '@/lib/types';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 interface ChatRequestBody {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   guideline: Guideline;
@@ -13,10 +9,25 @@ interface ChatRequestBody {
   mode: 'strict' | 'explain';
 }
 
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set. Please add it to your environment variables.');
+  }
+  
+  return new OpenAI({
+    apiKey: apiKey,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: ChatRequestBody = await req.json();
     const { messages, guideline, decision, mode } = body;
+
+    // Get OpenAI client (with error handling)
+    const openai = getOpenAIClient();
 
     // Build system prompt based on mode
     const systemPrompt = mode === 'strict' 

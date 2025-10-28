@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       : buildExplainPrompt(guideline, decision);
 
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages

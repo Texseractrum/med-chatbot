@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/shadcn-io/ai/prompt-input";
 import { Response } from "@/components/ui/shadcn-io/ai/response";
 import { Loader } from "@/components/ui/shadcn-io/ai/loader";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Eye, EyeOff } from "lucide-react";
 
 interface ChatPanelProps {
   guideline: Guideline | null;
@@ -36,6 +36,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [sessionId, setSessionId] = useState(() => Date.now());
+  const [showDetailedReasoning, setShowDetailedReasoning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
 
@@ -74,6 +75,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
           guideline,
           decision: null,
           mode,
+          showDetailedReasoning,
         }),
         signal: abortController.signal,
       });
@@ -189,6 +191,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
           guideline,
           decision: null,
           mode,
+          showDetailedReasoning,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -381,7 +384,28 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
         <div className="w-full mx-auto">
           {guideline ? (
             <>
-              <div className="flex justify-end mb-4">
+              <div className="flex justify-between mb-4">
+                <PromptInputButton
+                  onClick={() =>
+                    setShowDetailedReasoning(!showDetailedReasoning)
+                  }
+                  disabled={isLoading}
+                  variant={showDetailedReasoning ? "outline" : "ghost"}
+                  className={
+                    showDetailedReasoning
+                      ? "bg-blue-50 border-blue-300 text-blue-700"
+                      : ""
+                  }
+                >
+                  {showDetailedReasoning ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                  {showDetailedReasoning
+                    ? "Detailed Reasoning On"
+                    : "Detailed Reasoning Off"}
+                </PromptInputButton>
                 <PromptInputButton
                   onClick={handleNewConversation}
                   disabled={isLoading}

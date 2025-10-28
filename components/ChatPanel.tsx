@@ -50,7 +50,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
           messages: [
             {
               role: "user",
-              content: "Hello, I need help with a clinical case.",
+              content: "START_CONVERSATION",
             },
           ],
           guideline,

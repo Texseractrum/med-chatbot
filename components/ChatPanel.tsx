@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/shadcn-io/ai/prompt-input";
 import { Response } from "@/components/ui/shadcn-io/ai/response";
 import { Loader } from "@/components/ui/shadcn-io/ai/loader";
-import { PlusIcon, Eye, EyeOff } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 
 interface ChatPanelProps {
   guideline: Guideline | null;
@@ -36,9 +36,9 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [sessionId, setSessionId] = useState(() => Date.now());
-  const [showDetailedReasoning, setShowDetailedReasoning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Reset initialized ref when guideline changes
   useEffect(() => {
@@ -75,7 +75,6 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
           guideline,
           decision: null,
           mode,
-          showDetailedReasoning,
         }),
         signal: abortController.signal,
       });
@@ -191,7 +190,6 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
           guideline,
           decision: null,
           mode,
-          showDetailedReasoning,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -274,6 +272,11 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
       abortControllerRef.current = null;
     }
   };
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingMessage]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -373,6 +376,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
                     </MessageContent>
                   </Message>
                 )}
+                <div ref={messagesEndRef} />
               </div>
             </div>
           )}
@@ -384,28 +388,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
         <div className="w-full mx-auto">
           {guideline ? (
             <>
-              <div className="flex justify-between mb-4">
-                <PromptInputButton
-                  onClick={() =>
-                    setShowDetailedReasoning(!showDetailedReasoning)
-                  }
-                  disabled={isLoading}
-                  variant={showDetailedReasoning ? "outline" : "ghost"}
-                  className={
-                    showDetailedReasoning
-                      ? "bg-blue-50 border-blue-300 text-blue-700"
-                      : ""
-                  }
-                >
-                  {showDetailedReasoning ? (
-                    <Eye className="w-4 h-4" />
-                  ) : (
-                    <EyeOff className="w-4 h-4" />
-                  )}
-                  {showDetailedReasoning
-                    ? "Detailed Reasoning On"
-                    : "Detailed Reasoning Off"}
-                </PromptInputButton>
+              <div className="flex justify-end mb-4">
                 <PromptInputButton
                   onClick={handleNewConversation}
                   disabled={isLoading}

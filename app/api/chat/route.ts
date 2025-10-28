@@ -7,7 +7,6 @@ interface ChatRequestBody {
   guideline: Guideline;
   decision: DecisionResult | null;
   mode: 'strict' | 'explain';
-  showDetailedReasoning?: boolean;
 }
 
 function getOpenAIClient() {
@@ -56,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { messages, guideline, decision, mode, showDetailedReasoning = false } = body;
+    const { messages, guideline, decision, mode } = body;
 
     // Validate required fields
     if (!messages || !Array.isArray(messages)) {
@@ -85,8 +84,8 @@ export async function POST(req: NextRequest) {
 
     // Build system prompt based on mode
     const systemPrompt = mode === 'strict' 
-      ? buildStrictPrompt(guideline, decision, showDetailedReasoning)
-      : buildExplainPrompt(guideline, decision, showDetailedReasoning);
+      ? buildStrictPrompt(guideline, decision)
+      : buildExplainPrompt(guideline, decision);
 
     const stream = await openai.chat.completions.create({
       model: 'gpt-5',
@@ -135,7 +134,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function buildStrictPrompt(guideline: Guideline, decision: DecisionResult | null, showDetailedReasoning: boolean): string {
+function buildStrictPrompt(guideline: Guideline, decision: DecisionResult | null): string {
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -208,16 +207,10 @@ CONVERSATIONAL INSTRUCTIONS:
    - Don't explain that you're following a flowchart - just ask what you need to know
 
 4. WHEN PROVIDING RECOMMENDATIONS:
-   - Present the recommendation naturally ${showDetailedReasoning ? '(but include decision path if detailed reasoning is on)' : 'without mentioning the decision path'}
+   - Present the recommendation naturally without mentioning the decision path
    - If urgent, use "⚠️ URGENT: " prefix
    - Include relevant notes from the guideline
    - End with the citation naturally: "This recommendation is based on ${guideline.citation}"
-   ${showDetailedReasoning ? `
-   - DETAILED REASONING MODE: When providing recommendations, also include:
-     • Which nodes were evaluated and in what order
-     • What conditions were checked
-     • The decision path taken: ${decision?.path.join(' → ') || 'Path will be shown here'}
-     • Format this as a collapsible section: "📊 **Decision Tree Analysis:**"` : ''}
 
 5. EXAMPLE NATURAL FLOW:
    User: "I have a patient with hypertension"
@@ -233,7 +226,7 @@ CONVERSATIONAL INSTRUCTIONS:
 Remember: Be helpful, professional, and conversational. Guide the user naturally without exposing the technical decision tree mechanics.`;
 }
 
-function buildExplainPrompt(guideline: Guideline, decision: DecisionResult | null, showDetailedReasoning: boolean): string {
+function buildExplainPrompt(guideline: Guideline, decision: DecisionResult | null): string {
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -312,16 +305,10 @@ CONVERSATIONAL INSTRUCTIONS WITH EDUCATION:
 
 5. WHEN PROVIDING RECOMMENDATIONS:
    - Present the recommendation clearly
-   - Explain the clinical reasoning behind it ${showDetailedReasoning ? '(and include decision tree details if detailed reasoning is on)' : '(without mentioning the decision tree)'}
+   - Explain the clinical reasoning behind it (without mentioning the decision tree)
    - If urgent, use "⚠️ URGENT: " prefix and explain why it's urgent
    - Include practical implementation tips
    - End with: "This recommendation is based on ${guideline.citation}"
-   ${showDetailedReasoning ? `
-   - DETAILED REASONING MODE: Also include:
-     • A section titled "📊 **Decision Tree Analysis:**"
-     • Which nodes were evaluated and their conditions
-     • The exact decision path: ${decision?.path.join(' → ') || 'Path will be shown here'}
-     • Why each branch was taken based on the patient's values` : ''}
 
 6. EXAMPLE NATURAL EDUCATIONAL FLOW:
    User: "I have a patient with hypertension"

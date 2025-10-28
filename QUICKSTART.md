@@ -61,7 +61,7 @@
 
 1. **Click "Upload Guideline"** button
 2. **Select a PDF file** containing your clinical guideline
-3. Wait 15-30 seconds while the system:
+3. Wait while the system processes your PDF:
    - Extracts pages as images
    - Uses GPT-4 Vision to analyze flowcharts and decision logic
    - Converts to structured JSON format
@@ -72,7 +72,7 @@
 - Guidelines with flowcharts or decision trees
 - NICE guidelines, clinical pathways
 - Visual decision algorithms
-- Up to 10 pages (longer documents are truncated)
+- Multi-page documents supported
 
 ## Example Scenarios
 

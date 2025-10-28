@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI, { toFile } from 'openai';
-import { zodTextFormat } from 'openai/helpers/zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
+import { PDF_UPLOAD_CONFIG } from '@/lib/config/pdf-upload';
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -55,70 +56,6 @@ const GuidelineSchema = z.object({
   ),
 });
 
-// System prompt for parsing medical guidelines
-const systemPrompt = `You are a medical guideline parser. Analyze the clinical guideline PDF and extract a structured JSON format.
-
-This guideline may contain flowcharts, decision trees, and clinical pathways. Extract the decision logic carefully.
-
-The JSON must follow this exact schema:
-{
-  "guideline_id": "unique_id_based_on_guideline",
-  "name": "Full guideline name",
-  "version": "Version information",
-  "citation": "Citation text",
-  "citation_url": "https://source-url.com (use a reasonable URL if not available)",
-  "inputs": [
-    {
-      "id": "input_id (lowercase, underscores)",
-      "label": "Input Label",
-      "type": "number" or "boolean" or "text",
-      "unit": "unit (e.g., mmHg, years) or empty string if not applicable"
-    }
-  ],
-  "nodes": [
-    {
-      "id": "node_id",
-      "if": "condition expression using input ids (e.g., 'input_id >= 180')",
-      "then": "next_node_id (if condition is true) or empty string if terminal",
-      "else": "alternative_node_id (if condition is false) or empty string if terminal",
-      "then_action": {
-        "level": "info" or "advice" or "start" or "urgent",
-        "text": "Action text for when condition is true"
-      },
-      "else_action": {
-        "level": "info" or "advice" or "start" or "urgent",
-        "text": "Action text for when condition is false"
-      },
-      "notes": [
-        {
-          "if": "condition",
-          "text": "Additional note"
-        }
-      ] (use empty array [] if no notes)
-    }
-  ]
-}
-
-Important rules:
-1. Start with a "root" node that evaluates the first decision point
-2. Each node MUST have both then_action and else_action - these describe what happens for true/false conditions
-3. Use empty string ("") for then/else navigation if the node provides a final action
-4. Use empty string ("") for unit if not applicable
-5. Conditions use JavaScript syntax with input ids as variables
-6. Action levels: "info" (normal), "advice" (lifestyle/monitoring), "start" (begin treatment), "urgent" (emergency)
-7. Make the decision tree logical and clinically sound
-8. Extract all relevant decision points from the guideline, including flowcharts, decision trees, and clinical pathways
-9. Use empty array [] for notes if there are no conditional notes
-
-Extract the decision tree logic from this clinical guideline and convert it to the specified JSON format.
-
-Focus on:
-- Patient assessment criteria (these become inputs)
-- Decision points and thresholds
-- Treatment pathways
-- Urgent/emergency conditions
-
-Extract the decision tree logic from this medical guideline PDF and convert it to the structured format.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -142,44 +79,61 @@ export async function POST(req: NextRequest) {
     // Upload the PDF file to OpenAI
     const uploadedFile = await openai.files.create({
       file: await toFile(buffer, file.name, { type: file.type }),
-      purpose: 'user_data',
+      purpose: PDF_UPLOAD_CONFIG.openai.filePurpose,
     });
 
-    // Use the responses API with structured output parsing
-    const response = await openai.responses.parse({
-      model: 'gpt-4o-2024-08-06',
-      input: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_file',
-              file_id: uploadedFile.id,
-            },
-            {
-              type: 'input_text',
-              text: 'Please analyze this medical guideline PDF and extract the structured information.',
-            },
-          ],
-        },
-      ],
-      text: {
-        format: zodTextFormat(GuidelineSchema, 'medical_guideline'),
+    // Create an assistant with file search capability
+    const assistant = await openai.beta.assistants.create({
+      name: PDF_UPLOAD_CONFIG.openai.assistantName,
+      instructions: PDF_UPLOAD_CONFIG.systemPrompt,
+      model: PDF_UPLOAD_CONFIG.openai.model,
+      tools: [{ type: 'file_search' }],
+      tool_resources: {
+        file_search: {
+          vector_stores: [{
+            file_ids: [uploadedFile.id]
+          }]
+        }
       },
+      response_format: zodResponseFormat(GuidelineSchema, 'medical_guideline'),
     });
 
-    // Clean up the uploaded file
-    try {
-      await openai.files.delete(uploadedFile.id);
-    } catch (deleteError) {
-      console.warn('Failed to delete file:', deleteError);
+    // Create a thread and run
+    const thread = await openai.beta.threads.create({
+      messages: [{
+        role: 'user',
+        content: 'Please analyze this medical guideline PDF and extract the structured information.'
+      }]
+    });
+
+    const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+      assistant_id: assistant.id,
+    });
+
+    if (run.status !== 'completed') {
+      throw new Error(`Run failed with status: ${run.status}`);
     }
 
-    const guideline = response.output_parsed;
+    // Get the messages
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const assistantMessage = messages.data.find(m => m.role === 'assistant');
+    
+    // Clean up
+    try {
+      await openai.beta.assistants.delete(assistant.id);
+      await openai.files.delete(uploadedFile.id);
+    } catch (deleteError) {
+      console.warn('Failed to clean up resources:', deleteError);
+    }
+
+    if (!assistantMessage || !assistantMessage.content[0] || assistantMessage.content[0].type !== 'text') {
+      return NextResponse.json(
+        { error: 'No response from assistant' },
+        { status: 500 }
+      );
+    }
+
+    const guideline = JSON.parse(assistantMessage.content[0].text.value);
     
     if (!guideline) {
       return NextResponse.json(

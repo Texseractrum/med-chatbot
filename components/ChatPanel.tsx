@@ -1,10 +1,28 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import ScrollToBottom from "react-scroll-to-bottom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ChatMessage, Guideline } from "@/lib/types";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ui/shadcn-io/ai/conversation";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+} from "@/components/ui/shadcn-io/ai/message";
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+  PromptInputSubmit,
+  PromptInputButton,
+} from "@/components/ui/shadcn-io/ai/prompt-input";
+import { Response } from "@/components/ui/shadcn-io/ai/response";
+import { Loader } from "@/components/ui/shadcn-io/ai/loader";
+import { PlusIcon } from "lucide-react";
 
 interface ChatPanelProps {
   guideline: Guideline | null;
@@ -17,7 +35,7 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
-  const [sessionId, setSessionId] = useState(Date.now());
+  const [sessionId, setSessionId] = useState(() => Date.now());
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
 
@@ -61,9 +79,20 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Initial greeting failed:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        console.error("Initial greeting failed:", errorMessage);
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
@@ -134,7 +163,8 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
     initializedRef.current = false;
   };
 
-  const handleSend = async () => {
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input.trim() || !guideline) return;
 
     const userMessage: ChatMessage = {
@@ -164,7 +194,20 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        console.error("Chat request failed:", errorMessage);
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
@@ -238,159 +281,20 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
     };
   }, []);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
     <div className="flex flex-col h-full bg-gray-50">
-      <ScrollToBottom
-        className="flex-1 px-8 py-8 overflow-y-auto"
-        followButtonClassName="hidden"
-      >
-        {!guideline ? (
-          <div className="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto px-8">
-            <svg
-              className="w-24 h-24 mb-6 text-blue-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <p className="text-2xl font-bold text-gray-900 mb-3">
-              Welcome to Clinical Decision Support
-            </p>
-            <p className="text-base text-gray-600 mb-8 max-w-lg">
-              Upload a clinical guideline PDF to start a new conversation. The
-              AI will help you navigate through the guideline step-by-step.
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-lg w-full">
-              <p className="text-sm font-semibold text-blue-900 mb-3 text-center">
-                How it works:
-              </p>
-              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside text-left">
-                <li>
-                  Upload your clinical guideline PDF using the button above
-                </li>
-                <li>The AI will analyze the guideline and greet you</li>
-                <li>Describe your patient&apos;s situation</li>
-                <li>
-                  The AI will guide you through the flowchart by asking
-                  questions
-                </li>
-              </ol>
-            </div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 max-w-2xl mx-auto">
-            <div className="flex items-center gap-2 text-gray-600 mb-4">
-              <div className="flex gap-1.5">
-                <div
-                  className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                ></div>
-              </div>
-            </div>
-            <p className="text-sm font-medium text-gray-700 mb-1">
-              Initializing Clinical Assistant
-            </p>
-            <p className="text-xs text-gray-600">Loading {guideline.name}...</p>
-          </div>
-        ) : (
-          <div className="space-y-4 max-w-4xl mx-auto">
-            {messages.map((message, idx) => (
-              <div
-                key={idx}
-                className={`flex animate-fadeIn ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-3xl rounded-xl px-4 py-3 shadow-sm ${
-                    message.role === "user"
-                      ? "bg-linear-to-br from-blue-600 to-blue-700 text-white"
-                      : "bg-white text-gray-900 border border-gray-200"
-                  }`}
-                >
-                  {message.role === "user" ? (
-                    <div className="text-xs leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </div>
-                  ) : (
-                    <div className="markdown text-xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {streamingMessage && (
-              <div className="flex justify-start animate-fadeIn">
-                <div className="max-w-3xl rounded-xl px-4 py-3 bg-white text-gray-900 border border-gray-200 shadow-sm">
-                  <div className="markdown text-xs streaming-cursor">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {streamingMessage}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            )}
-            {isLoading && !streamingMessage && (
-              <div className="flex justify-start animate-fadeIn">
-                <div className="bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <div className="flex gap-1.5">
-                      <div
-                        className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      ></div>
-                    </div>
-                    <span className="text-xs font-medium">Thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollToBottom>
-
-      <div className="border-t border-gray-200 px-8 py-4 bg-white shadow-lg">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={handleNewConversation}
-              disabled={isLoading}
-              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
-            >
+      <Conversation className="flex-1">
+        <ConversationContent
+          className={`py-6 px-4 sm:px-6 md:px-8 h-full ${
+            !guideline || messages.length === 0
+              ? "flex items-center justify-center"
+              : ""
+          }`}
+        >
+          {!guideline ? (
+            <div className="flex flex-col items-center justify-center text-center max-w-2xl w-full">
               <svg
-                className="w-3.5 h-3.5"
+                className="w-24 h-24 mb-6 text-blue-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -399,77 +303,126 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M12 4v16m8-8H4"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              New Conversation
-            </button>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={!guideline || isLoading}
-                placeholder={
-                  guideline
-                    ? "Describe your patient's situation or ask a question..."
-                    : "Select a guideline to start"
-                }
-                className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 transition-all text-sm text-gray-900 placeholder-gray-500 shadow-sm"
-              />
+              <p className="text-2xl font-bold text-gray-900 mb-3">
+                Welcome to Clinical Decision Support
+              </p>
+              <p className="text-base text-gray-600 mb-8 max-w-lg">
+                Upload a clinical guideline PDF to start a new conversation. The
+                AI will help you navigate through the guideline step-by-step.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-lg w-full">
+                <p className="text-sm font-semibold text-blue-900 mb-3 text-center">
+                  How it works:
+                </p>
+                <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside text-left">
+                  <li>
+                    Upload your clinical guideline PDF using the button above
+                  </li>
+                  <li>The AI will analyze the guideline and greet you</li>
+                  <li>Describe your patient&apos;s situation</li>
+                  <li>
+                    The AI will guide you through the flowchart by asking
+                    questions
+                  </li>
+                </ol>
+              </div>
             </div>
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || !guideline || isLoading}
-              className="px-6 py-4 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
-            >
-              {isLoading ? (
-                <>
-                  <svg
-                    className="animate-spin h-6 w-6"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  <span>Sending</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center text-gray-500 max-w-2xl w-full">
+              <Loader />
+              <p className="text-sm font-medium text-gray-700 mb-1 mt-4">
+                Initializing Clinical Assistant
+              </p>
+              <p className="text-xs text-gray-600">
+                Loading {guideline.name}...
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-5xl w-full">
+              <div className="space-y-4">
+                {messages.map((message, idx) => (
+                  <Message key={idx} from={message.role}>
+                    <MessageAvatar
+                      src={message.role === "user" ? "" : ""}
+                      name={message.role === "user" ? "You" : "AI"}
                     />
-                  </svg>
-                  <span>Send</span>
-                </>
-              )}
-            </button>
-          </div>
+                    <MessageContent>
+                      <Response>{message.content}</Response>
+                    </MessageContent>
+                  </Message>
+                ))}
+                {streamingMessage && (
+                  <Message from="assistant">
+                    <MessageAvatar src="" name="AI" />
+                    <MessageContent>
+                      <Response>{streamingMessage}</Response>
+                    </MessageContent>
+                  </Message>
+                )}
+                {isLoading && !streamingMessage && (
+                  <Message from="assistant">
+                    <MessageAvatar src="" name="AI" />
+                    <MessageContent>
+                      <Loader />
+                    </MessageContent>
+                  </Message>
+                )}
+              </div>
+            </div>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      <div className="border-t border-gray-200 px-4 sm:px-6 md:px-8 pt-6 pb-8 bg-white shadow-lg">
+        <div className="w-full mx-auto">
+          {guideline ? (
+            <>
+              <div className="flex justify-end mb-4">
+                <PromptInputButton
+                  onClick={handleNewConversation}
+                  disabled={isLoading}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  New Conversation
+                </PromptInputButton>
+              </div>
+              <PromptInput onSubmit={handleSend}>
+                <PromptInputTextarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={!guideline || isLoading}
+                  placeholder="Describe your patient's situation or ask a question..."
+                />
+                <PromptInputToolbar>
+                  <PromptInputTools>
+                    {/* Add any additional tools here */}
+                  </PromptInputTools>
+                  <PromptInputSubmit
+                    disabled={!input.trim() || !guideline || isLoading}
+                    status={isLoading ? "streaming" : undefined}
+                  />
+                </PromptInputToolbar>
+              </PromptInput>
+            </>
+          ) : (
+            <div className="flex items-center justify-center py-4 w-full">
+              <div
+                className="bg-gray-100 rounded-lg overflow-visible"
+                style={{ padding: "3rem 6rem" }}
+              >
+                <p
+                  className="text-base text-gray-600 whitespace-nowrap tracking-wide leading-relaxed antialiased"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  Select a guideline to start
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

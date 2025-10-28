@@ -2,7 +2,6 @@
 
 import { useState, useRef } from "react";
 import ChatPanel from "@/components/ChatPanel";
-import SafetyBanner from "@/components/SafetyBanner";
 import { Guideline } from "@/lib/types";
 
 export default function Home() {
@@ -108,22 +107,22 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-12 py-5 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-4 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <div className="min-w-0">
               <h1 className="text-lg font-bold text-gray-900">
                 Clinical Decision Support
               </h1>
-              <p className="text-sm text-gray-600 mt-0.5">
+              <p className="text-sm text-gray-600 mt-0.5 truncate">
                 {activeGuideline?.name || "Select a guideline"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setShowGuidelineSelector(!showGuidelineSelector)}
-              className="px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow max-w-xs truncate"
+              className="px-5 py-2.5 text-sm font-medium rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow max-w-xs truncate"
               title={
                 activeGuideline
                   ? activeGuideline.guideline_id
@@ -142,7 +141,7 @@ export default function Home() {
             <div className="h-6 w-px bg-gray-300"></div>
             <button
               onClick={() => setMode("strict")}
-              className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
+              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
                 mode === "strict"
                   ? "bg-blue-600 text-white"
                   : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
@@ -152,7 +151,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setMode("explain")}
-              className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
+              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
                 mode === "explain"
                   ? "bg-blue-600 text-white"
                   : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
@@ -166,8 +165,8 @@ export default function Home() {
 
       {/* Guideline Selector Dropdown */}
       {showGuidelineSelector && (
-        <div className="bg-white border-b border-gray-200 px-12 py-5 shadow-md">
-          <div className="max-w-6xl mx-auto">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-6 shadow-md">
+          <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">
                 Select or Upload a Guideline
@@ -341,9 +340,6 @@ export default function Home() {
           onModeChange={setMode}
         />
       </div>
-
-      {/* Safety Footer */}
-      <SafetyBanner />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Guideline } from "@/lib/types";
+import { PDF_UPLOAD_CONFIG } from "@/lib/config/pdf-upload";
 
 interface GuidelineSelectorProps {
   guidelines: Guideline[];
@@ -53,13 +54,13 @@ export default function GuidelineSelector({
     // Handle PDF files
     else if (fileExtension === "pdf") {
       setIsProcessing(true);
-      setProcessingMessage("Extracting text from PDF...");
+      setProcessingMessage(PDF_UPLOAD_CONFIG.messages.extracting);
 
       try {
         const formData = new FormData();
         formData.append("file", file);
 
-        setProcessingMessage("Converting guideline to structured format...");
+        setProcessingMessage(PDF_UPLOAD_CONFIG.messages.converting);
         const response = await fetch("/api/parse-pdf", {
           method: "POST",
           body: formData,
@@ -71,14 +72,14 @@ export default function GuidelineSelector({
           throw new Error(data.error);
         }
 
-        setProcessingMessage("Guideline processed successfully!");
+        setProcessingMessage(PDF_UPLOAD_CONFIG.messages.success);
         onUpload(data.guideline);
 
         // Reset input
         e.target.value = "";
       } catch (error) {
         alert(
-          `Error processing PDF: ${
+          `${PDF_UPLOAD_CONFIG.messages.errorPrefix} ${
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
@@ -87,7 +88,7 @@ export default function GuidelineSelector({
         setProcessingMessage("");
       }
     } else {
-      alert("Please upload a JSON or PDF file.");
+      alert(PDF_UPLOAD_CONFIG.messages.invalidFileType);
       e.target.value = "";
     }
   };
@@ -100,7 +101,11 @@ export default function GuidelineSelector({
             Clinical Guidelines
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Select an existing guideline or upload a new one (JSON or PDF)
+            Select an existing guideline or upload a new one (
+            {PDF_UPLOAD_CONFIG.constraints.supportedFormats
+              .map((f) => f.slice(1).toUpperCase())
+              .join(" or ")}
+            )
           </p>
         </div>
         <label
@@ -154,7 +159,7 @@ export default function GuidelineSelector({
           )}
           <input
             type="file"
-            accept=".json,.pdf"
+            accept={PDF_UPLOAD_CONFIG.constraints.supportedFormats.join(",")}
             onChange={handleFileUpload}
             className="hidden"
             disabled={isProcessing}

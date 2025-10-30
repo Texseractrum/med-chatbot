@@ -463,34 +463,29 @@ export default function Home() {
           )}
 
           {/* PDF Viewer Panel */}
-          <div
-            className={`relative bg-white border-t lg:border-t-0 lg:border-l border-gray-200 ${
-              showPdfViewer
-                ? "h-80 lg:h-full"
-                : "lg:w-0 h-0 lg:h-full overflow-hidden"
-            }`}
-            style={showPdfViewer ? { width: `${pdfViewerWidth}px` } : {}}
-          >
-            {/* PDF Content */}
-            {showPdfViewer && (
-              <>
-                {activeGuideline &&
-                guidelinePdfMap[activeGuideline.guideline_id] ? (
-                  <iframe
-                    src={guidelinePdfMap[activeGuideline.guideline_id]}
-                    className="w-full h-full"
-                    title={`${activeGuideline.name} flowchart`}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
-                    {activeGuideline
-                      ? "Upload a PDF flowchart to preview it here."
-                      : "Select a guideline to view its flowchart."}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          {showPdfViewer && (
+            <div
+              className="relative bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full shrink-0"
+              style={{ width: `${pdfViewerWidth}px` }}
+            >
+              {/* PDF Content */}
+              {activeGuideline &&
+              guidelinePdfMap[activeGuideline.guideline_id] ? (
+                <iframe
+                  src={guidelinePdfMap[activeGuideline.guideline_id]}
+                  className="w-full h-full border-0"
+                  title={`${activeGuideline.name} flowchart`}
+                  style={{ pointerEvents: isDragging ? "none" : "auto" }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
+                  {activeGuideline
+                    ? "Upload a PDF flowchart to preview it here."
+                    : "Select a guideline to view its flowchart."}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

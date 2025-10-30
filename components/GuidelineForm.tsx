@@ -51,7 +51,11 @@ export default function GuidelineForm({
             {input.type === "number" ? (
               <input
                 type="number"
-                value={values[input.id] || ""}
+                value={
+                  typeof values[input.id] === "number"
+                    ? (values[input.id] as number)
+                    : ""
+                }
                 onChange={(e) =>
                   handleInputChange(
                     input.id,
@@ -87,7 +91,11 @@ export default function GuidelineForm({
             ) : (
               <input
                 type="text"
-                value={values[input.id] || ""}
+                value={
+                  typeof values[input.id] === "string"
+                    ? (values[input.id] as string)
+                    : ""
+                }
                 onChange={(e) => handleInputChange(input.id, e.target.value)}
                 className="w-full px-3 py-2 text-xs border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
                 placeholder={`Enter ${input.label.toLowerCase()}`}

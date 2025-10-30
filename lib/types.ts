@@ -1,3 +1,5 @@
+export type GuidelineInputValue = string | number | boolean | "";
+
 export interface GuidelineInput {
   id: string;
   label: string;

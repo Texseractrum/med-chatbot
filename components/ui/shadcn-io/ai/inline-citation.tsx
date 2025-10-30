@@ -14,7 +14,14 @@ import {
 } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
 import { ArrowLeftIcon, ArrowRightIcon } from 'lucide-react';
-import { type ComponentProps, useCallback, useEffect, useState, useRef, createContext, useContext } from 'react';
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useState,
+  createContext,
+  useContext,
+} from 'react';
 
 // Context to share carousel API with child components
 const CarouselApiContext = createContext<CarouselApi | undefined>(undefined);
@@ -159,12 +166,20 @@ export const InlineCitationCarouselIndex = ({
       return;
     }
 
-    setCount(api.scrollSnapList().length);
-    setCurrent(api.selectedScrollSnap() + 1);
-
-    api.on('select', () => {
+    const updateFromApi = () => {
+      setCount(api.scrollSnapList().length);
       setCurrent(api.selectedScrollSnap() + 1);
-    });
+    };
+
+    updateFromApi();
+
+    api.on('select', updateFromApi);
+    api.on('reInit', updateFromApi);
+
+    return () => {
+      api.off('select', updateFromApi);
+      api.off('reInit', updateFromApi);
+    };
   }, [api]);
 
   return (

@@ -1,10 +1,20 @@
-import { Guideline, DecisionResult, DecisionNode } from "./types";
+import {
+  Guideline,
+  DecisionResult,
+  DecisionNode,
+  GuidelineInputValue,
+} from "./types";
+
+type DecisionInputValue = GuidelineInputValue | null | undefined;
 
 export class DecisionEngine {
   private guideline: Guideline;
-  private inputs: Record<string, any>;
+  private inputs: Record<string, DecisionInputValue>;
 
-  constructor(guideline: Guideline, inputs: Record<string, any>) {
+  constructor(
+    guideline: Guideline,
+    inputs: Record<string, DecisionInputValue>
+  ) {
     this.guideline = guideline;
     this.inputs = inputs;
   }
@@ -71,7 +81,9 @@ export class DecisionEngine {
   private evaluateCondition(condition: string): boolean {
     try {
       // Create a safe evaluation context with only the input variables
-      const context = { ...this.inputs };
+      const context: Record<string, DecisionInputValue> = {
+        ...this.inputs,
+      };
       
       // Replace variable names with their values
       let evaluableCondition = condition;
@@ -82,8 +94,8 @@ export class DecisionEngine {
       
       // Use Function constructor for safe evaluation
       // This is safer than eval() but still requires trusted input
-      const func = new Function(`return ${evaluableCondition};`);
-      return func();
+      const func = new Function(`return ${evaluableCondition};`) as () => unknown;
+      return Boolean(func());
     } catch (error) {
       console.error(`Error evaluating condition: ${condition}`, error);
       return false;

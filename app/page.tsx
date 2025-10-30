@@ -15,8 +15,14 @@ export default function Home() {
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [guidelinePdfMap, setGuidelinePdfMap] = useState<Record<string, string>>({});
+  const [guidelinePdfMap, setGuidelinePdfMap] = useState<
+    Record<string, string>
+  >({});
   const pdfMapRef = useRef<Record<string, string>>({});
+  const [showPdfViewer, setShowPdfViewer] = useState(true);
+  const [pdfViewerWidth, setPdfViewerWidth] = useState(400); // Width in pixels
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     pdfMapRef.current = guidelinePdfMap;
@@ -29,6 +35,40 @@ export default function Home() {
       });
     };
   }, []);
+
+  // Handle dragging for resizing PDF viewer
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newWidth = containerRect.right - e.clientX;
+
+      // Constrain width between 250px and 80% of container width
+      const minWidth = 250;
+      const maxWidth = containerRect.width * 0.8;
+
+      setPdfViewerWidth(Math.max(minWidth, Math.min(newWidth, maxWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isDragging]);
 
   const handleGuidelineSelect = (guideline: Guideline) => {
     setActiveGuideline(guideline);
@@ -175,7 +215,10 @@ export default function Home() {
                 </span>
               </span>
             </button>
-            <div className="hidden sm:block h-6 w-px bg-gray-300" aria-hidden="true"></div>
+            <div
+              className="hidden sm:block h-6 w-px bg-gray-300"
+              aria-hidden="true"
+            ></div>
             <div className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setMode("strict")}
@@ -372,8 +415,11 @@ export default function Home() {
 
       {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col lg:flex-row">
-          <div className="flex-1 overflow-hidden border-b lg:border-b-0 lg:border-r border-gray-200">
+        <div
+          ref={containerRef}
+          className="h-full flex flex-col lg:flex-row relative"
+        >
+          <div className="flex-1 overflow-hidden border-b lg:border-b-0 border-gray-200">
             <ChatPanel
               key={sessionKey}
               guideline={activeGuideline}
@@ -381,19 +427,68 @@ export default function Home() {
               onModeChange={setMode}
             />
           </div>
-          <div className="lg:w-1/3 xl:w-2/5 h-80 lg:h-full bg-white border-t lg:border-t-0 lg:border-l border-gray-200">
-            {activeGuideline && guidelinePdfMap[activeGuideline.guideline_id] ? (
-              <iframe
-                src={guidelinePdfMap[activeGuideline.guideline_id]}
-                className="w-full h-full"
-                title={`${activeGuideline.name} flowchart`}
+
+          {/* PDF Viewer Toggle Button - Always visible */}
+          <button
+            onClick={() => setShowPdfViewer(!showPdfViewer)}
+            className="absolute top-4 right-4 z-20 p-2 bg-white border border-gray-300 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+            title={showPdfViewer ? "Hide PDF viewer" : "Show PDF viewer"}
+          >
+            <svg
+              className={`w-4 h-4 text-gray-700 transition-transform duration-300 ${
+                showPdfViewer ? "" : "rotate-180"
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
               />
-            ) : (
-              <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
-                {activeGuideline
-                  ? "Upload a PDF flowchart to preview it here."
-                  : "Select a guideline to view its flowchart."}
-              </div>
+            </svg>
+          </button>
+
+          {/* Draggable Divider - only show when PDF viewer is visible */}
+          {showPdfViewer && (
+            <div
+              onMouseDown={() => setIsDragging(true)}
+              className="hidden lg:block w-1 bg-gray-300 hover:bg-blue-500 cursor-ew-resize transition-colors relative group"
+              title="Drag to resize"
+            >
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+            </div>
+          )}
+
+          {/* PDF Viewer Panel */}
+          <div
+            className={`relative bg-white border-t lg:border-t-0 lg:border-l border-gray-200 ${
+              showPdfViewer
+                ? "h-80 lg:h-full"
+                : "lg:w-0 h-0 lg:h-full overflow-hidden"
+            }`}
+            style={showPdfViewer ? { width: `${pdfViewerWidth}px` } : {}}
+          >
+            {/* PDF Content */}
+            {showPdfViewer && (
+              <>
+                {activeGuideline &&
+                guidelinePdfMap[activeGuideline.guideline_id] ? (
+                  <iframe
+                    src={guidelinePdfMap[activeGuideline.guideline_id]}
+                    className="w-full h-full"
+                    title={`${activeGuideline.name} flowchart`}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
+                    {activeGuideline
+                      ? "Upload a PDF flowchart to preview it here."
+                      : "Select a guideline to view its flowchart."}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

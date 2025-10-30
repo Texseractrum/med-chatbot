@@ -2,10 +2,12 @@
 
 import { Guideline } from "@/lib/types";
 
+type GuidelineInputValue = string | number | boolean | "";
+
 interface GuidelineFormProps {
   guideline: Guideline;
-  values: Record<string, any>;
-  onChange: (values: Record<string, any>) => void;
+  values: Record<string, GuidelineInputValue>;
+  onChange: (values: Record<string, GuidelineInputValue>) => void;
 }
 
 export default function GuidelineForm({
@@ -13,7 +15,7 @@ export default function GuidelineForm({
   values,
   onChange,
 }: GuidelineFormProps) {
-  const handleInputChange = (id: string, value: any) => {
+  const handleInputChange = (id: string, value: GuidelineInputValue) => {
     onChange({ ...values, [id]: value });
   };
 

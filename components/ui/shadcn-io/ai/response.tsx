@@ -322,12 +322,11 @@ const components: Options['components'] = {
 
     // Extract code content from children safely
     let code = '';
-    if (
-      isValidElement(children) &&
-      children.props &&
-      typeof (children.props as any).children === 'string'
-    ) {
-      code = (children.props as any).children;
+    if (isValidElement(children)) {
+      const childProps = children.props as { children?: unknown };
+      if (typeof childProps.children === 'string') {
+        code = childProps.children;
+      }
     } else if (typeof children === 'string') {
       code = children;
     }

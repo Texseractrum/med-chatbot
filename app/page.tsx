@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import { Guideline } from "@/lib/types";
 
@@ -15,6 +15,20 @@ export default function Home() {
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [guidelinePdfMap, setGuidelinePdfMap] = useState<Record<string, string>>({});
+  const pdfMapRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    pdfMapRef.current = guidelinePdfMap;
+  }, [guidelinePdfMap]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(pdfMapRef.current).forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   const handleGuidelineSelect = (guideline: Guideline) => {
     setActiveGuideline(guideline);
@@ -38,6 +52,14 @@ export default function Home() {
 
     setGuidelines((prev) => prev.filter((g) => g.guideline_id !== guidelineId));
 
+    setGuidelinePdfMap((prev) => {
+      const { [guidelineId]: removedUrl, ...rest } = prev;
+      if (removedUrl) {
+        URL.revokeObjectURL(removedUrl);
+      }
+      return rest;
+    });
+
     // If the deleted guideline was active, switch to the first remaining guideline
     if (activeGuideline?.guideline_id === guidelineId) {
       const remainingGuidelines = guidelines.filter(
@@ -60,6 +82,8 @@ export default function Home() {
     const formData = new FormData();
     formData.append("file", file);
 
+    const pdfUrl = URL.createObjectURL(file);
+
     try {
       const response = await fetch("/api/parse-pdf", {
         method: "POST",
@@ -70,6 +94,7 @@ export default function Home() {
 
       if (data.error) {
         setUploadError(data.error);
+        URL.revokeObjectURL(pdfUrl);
         setIsUploadingPdf(false);
         return;
       }
@@ -85,6 +110,17 @@ export default function Home() {
         setGuidelines((prev) => [...prev, newGuideline]);
       }
 
+      setGuidelinePdfMap((prev) => {
+        const existingUrl = prev[newGuideline.guideline_id];
+        if (existingUrl) {
+          URL.revokeObjectURL(existingUrl);
+        }
+        return {
+          ...prev,
+          [newGuideline.guideline_id]: pdfUrl,
+        };
+      });
+
       setActiveGuideline(newGuideline);
       setShowGuidelineSelector(false);
       setSessionKey((prev) => prev + 1); // Force chat to reset
@@ -95,6 +131,7 @@ export default function Home() {
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
+      URL.revokeObjectURL(pdfUrl);
       setIsUploadingPdf(false);
     }
 
@@ -108,8 +145,8 @@ export default function Home() {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="max-w-7xl mx-auto flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-4 min-w-0 flex-1">
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-gray-900">
                 Clinical Decision Support
@@ -119,17 +156,17 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <button
               onClick={() => setShowGuidelineSelector(!showGuidelineSelector)}
-              className="px-5 py-2.5 text-sm font-medium rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow max-w-xs truncate"
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow max-w-full sm:max-w-xs truncate"
               title={
                 activeGuideline
                   ? activeGuideline.guideline_id
                   : "Select Guideline"
               }
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <span>📚</span>
                 <span className="truncate">
                   {activeGuideline
@@ -138,27 +175,29 @@ export default function Home() {
                 </span>
               </span>
             </button>
-            <div className="h-6 w-px bg-gray-300"></div>
-            <button
-              onClick={() => setMode("strict")}
-              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
-                mode === "strict"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
-              }`}
-            >
-              📋 Strict
-            </button>
-            <button
-              onClick={() => setMode("explain")}
-              className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
-                mode === "explain"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
-              }`}
-            >
-              💡 Explain
-            </button>
+            <div className="hidden sm:block h-6 w-px bg-gray-300" aria-hidden="true"></div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setMode("strict")}
+                className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
+                  mode === "strict"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
+                }`}
+              >
+                📋 Strict
+              </button>
+              <button
+                onClick={() => setMode("explain")}
+                className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow ${
+                  mode === "explain"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300"
+                }`}
+              >
+                💡 Explain
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -333,12 +372,31 @@ export default function Home() {
 
       {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
-        <ChatPanel
-          key={sessionKey}
-          guideline={activeGuideline}
-          mode={mode}
-          onModeChange={setMode}
-        />
+        <div className="h-full flex flex-col lg:flex-row">
+          <div className="flex-1 overflow-hidden border-b lg:border-b-0 lg:border-r border-gray-200">
+            <ChatPanel
+              key={sessionKey}
+              guideline={activeGuideline}
+              mode={mode}
+              onModeChange={setMode}
+            />
+          </div>
+          <div className="lg:w-1/3 xl:w-2/5 h-80 lg:h-full bg-white border-t lg:border-t-0 lg:border-l border-gray-200">
+            {activeGuideline && guidelinePdfMap[activeGuideline.guideline_id] ? (
+              <iframe
+                src={guidelinePdfMap[activeGuideline.guideline_id]}
+                className="w-full h-full"
+                title={`${activeGuideline.name} flowchart`}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
+                {activeGuideline
+                  ? "Upload a PDF flowchart to preview it here."
+                  : "Select a guideline to view its flowchart."}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

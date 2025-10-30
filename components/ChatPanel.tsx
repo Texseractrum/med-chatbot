@@ -419,10 +419,10 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
             <div className="flex items-center justify-center py-4 w-full">
               <div
                 className="bg-gray-100 rounded-lg overflow-visible"
-                style={{ padding: "3rem 6rem" }}
+                style={{ padding: "1rem 2.5rem" }}
               >
                 <p
-                  className="text-base text-gray-600 whitespace-nowrap tracking-wide leading-relaxed antialiased"
+                  className="text-sm text-gray-600 whitespace-nowrap tracking-wide leading-relaxed antialiased"
                   style={{ letterSpacing: "0.05em" }}
                 >
                   Select a guideline to start

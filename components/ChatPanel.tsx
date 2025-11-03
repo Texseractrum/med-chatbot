@@ -315,26 +315,10 @@ export default function ChatPanel({ guideline, mode }: ChatPanelProps) {
               <p className="text-2xl font-bold text-gray-900 mb-3">
                 Welcome to Clinical Decision Support
               </p>
-              <p className="text-base text-gray-600 mb-8 max-w-lg">
+              <p className="text-base text-gray-600 max-w-lg">
                 Upload a clinical guideline PDF to start a new conversation. The
                 AI will help you navigate through the guideline step-by-step.
               </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-lg w-full">
-                <p className="text-sm font-semibold text-blue-900 mb-3 text-center">
-                  How it works:
-                </p>
-                <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside text-left">
-                  <li>
-                    Upload your clinical guideline PDF using the button above
-                  </li>
-                  <li>The AI will analyze the guideline and greet you</li>
-                  <li>Describe your patient&apos;s situation</li>
-                  <li>
-                    The AI will guide you through the flowchart by asking
-                    questions
-                  </li>
-                </ol>
-              </div>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center text-gray-500 max-w-2xl w-full">

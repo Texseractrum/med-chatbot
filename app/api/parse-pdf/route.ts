@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
           }]
         }
       },
-      response_format: zodResponseFormat(GuidelineSchema, 'medical_guideline'),
+      response_format: zodResponseFormat(GuidelineSchema, 'medical-guideline'),
     });
 
     // Create a thread and run

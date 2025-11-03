@@ -7,6 +7,7 @@ import PatientInfoPanel, {
   PatientRecord,
 } from "@/components/PatientInfoPanel";
 import AddPatientModal from "@/components/AddPatientModal";
+import ResizablePanel from "@/components/ResizablePanel";
 
 export default function Home() {
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
@@ -247,7 +248,7 @@ export default function Home() {
             >
               <span>🩺</span>
               <span className="truncate">
-                {showPatientPanel ? "Hide Patient Window" : "Show Patient Window"}
+                {showPatientPanel ? "Hide Patient Panel" : "Show Patient Panel"}
               </span>
             </button>
           </div>
@@ -424,34 +425,36 @@ export default function Home() {
 
       {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col lg:flex-row relative">
-          <div className="flex-1 overflow-hidden border-b lg:border-b-0 border-gray-200">
+        <ResizablePanel
+          leftPanel={
             <ChatPanel
               key={sessionKey}
               guideline={activeGuideline}
               mode={mode}
               onModeChange={setMode}
             />
-          </div>
-          {/* Patient Records Panel */}
-          {showPatientPanel && (
+          }
+          rightPanel={
             <PatientInfoPanel
               records={patientRecords}
               onAddPatient={() => setIsAddPatientOpen(true)}
-              className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[420px] shrink-0"
+              className="bg-white h-full w-full"
             />
-          )}
-        </div>
+          }
+          showRightPanel={showPatientPanel}
+          defaultRightWidth={600}
+          minRightWidth={400}
+          maxRightWidth={900}
+        />
       </div>
       {isAddPatientOpen && (
         <AddPatientModal
           onClose={() => setIsAddPatientOpen(false)}
           onSave={(patient) => {
-            setShowPatientPanel(true);
             handlePatientSave(patient);
           }}
         />
       )}
-      </div>
-    );
+    </div>
+  );
 }

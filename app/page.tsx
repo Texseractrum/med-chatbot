@@ -6,6 +6,7 @@ import { Guideline } from "@/lib/types";
 import PatientInfoPanel, {
   PatientRecord,
 } from "@/components/PatientInfoPanel";
+import AddPatientModal from "@/components/AddPatientModal";
 
 export default function Home() {
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
@@ -19,7 +20,8 @@ export default function Home() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPatientPanel, setShowPatientPanel] = useState(true);
-  const patientRecords: PatientRecord[] = [
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
     {
       id: "PT-204",
       name: "Alex Morgan",
@@ -62,7 +64,33 @@ export default function Home() {
       clinician: "Dr. Amina El-Sayed",
       notes: "Diuresis effective. Plan transition to oral regimen tomorrow.",
     },
-  ];
+  ]);
+
+  const formatLastUpdated = () => {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+      .format(new Date())
+      .replace(/\s/g, " ")
+      .replace(",", "");
+  };
+
+  const handlePatientSave = (record: Omit<PatientRecord, "lastUpdated">) => {
+    const lastUpdated = formatLastUpdated();
+
+    setPatientRecords((prev) => {
+      const filtered = prev.filter((existing) => existing.id !== record.id);
+      return [
+        {
+          ...record,
+          lastUpdated,
+        },
+        ...filtered,
+      ];
+    });
+  };
 
   const handleGuidelineSelect = (guideline: Guideline) => {
     setActiveGuideline(guideline);
@@ -212,6 +240,16 @@ export default function Home() {
                 💡 Explain
               </button>
             </div>
+            <button
+              onClick={() => setShowPatientPanel((prev) => !prev)}
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+              aria-pressed={showPatientPanel}
+            >
+              <span>🩺</span>
+              <span className="truncate">
+                {showPatientPanel ? "Hide Patient Window" : "Show Patient Window"}
+              </span>
+            </button>
           </div>
         </div>
       </header>
@@ -395,39 +433,25 @@ export default function Home() {
               onModeChange={setMode}
             />
           </div>
-
-          {/* Patient Records Toggle Button - Always visible */}
-          <button
-            onClick={() => setShowPatientPanel(!showPatientPanel)}
-            className="absolute top-4 right-4 z-20 p-2 bg-white border border-gray-300 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
-            title={showPatientPanel ? "Hide patient records" : "Show patient records"}
-          >
-            <svg
-              className={`w-4 h-4 text-gray-700 transition-transform duration-300 ${
-                showPatientPanel ? "" : "rotate-180"
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h7"
-              />
-            </svg>
-          </button>
-
           {/* Patient Records Panel */}
           {showPatientPanel && (
             <PatientInfoPanel
               records={patientRecords}
+              onAddPatient={() => setIsAddPatientOpen(true)}
               className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[420px] shrink-0"
             />
           )}
         </div>
       </div>
-    </div>
-  );
+      {isAddPatientOpen && (
+        <AddPatientModal
+          onClose={() => setIsAddPatientOpen(false)}
+          onSave={(patient) => {
+            setShowPatientPanel(true);
+            handlePatientSave(patient);
+          }}
+        />
+      )}
+      </div>
+    );
 }

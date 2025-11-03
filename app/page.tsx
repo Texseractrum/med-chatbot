@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import { Guideline } from "@/lib/types";
 import PatientInfoPanel, {
@@ -22,10 +21,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPatientPanel, setShowPatientPanel] = useState(true);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
-  const [isLargeScreen, setIsLargeScreen] = useState(false);
-  const [isResizingPatientPanel, setIsResizingPatientPanel] = useState(false);
-  const [patientPanelWidth, setPatientPanelWidth] = useState(480);
-  const layoutRef = useRef<HTMLDivElement>(null);
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
     {
       id: "PT-204",
@@ -71,9 +66,6 @@ export default function Home() {
     },
   ]);
 
-  const MIN_PATIENT_PANEL_WIDTH = 360;
-  const MAX_PATIENT_PANEL_WIDTH = 640;
-
   const formatLastUpdated = () => {
     return new Intl.DateTimeFormat("en-GB", {
       day: "2-digit",
@@ -99,80 +91,6 @@ export default function Home() {
       ];
     });
   };
-
-  const handleGuidelineSelect = (guideline: Guideline) => {
-    setActiveGuideline(guideline);
-    setShowGuidelineSelector(false);
-    setSessionKey((prev) => prev + 1); // Force chat to reset
-  };
-
-  const togglePatientPanel = () => {
-    if (isResizingPatientPanel) {
-      setIsResizingPatientPanel(false);
-    }
-
-    setShowPatientPanel((prev) => !prev);
-  };
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-
-    const updateMatch = () => {
-      setIsLargeScreen(mediaQuery.matches);
-    };
-
-    updateMatch();
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateMatch);
-      return () => mediaQuery.removeEventListener("change", updateMatch);
-    }
-
-    mediaQuery.addListener(updateMatch);
-    return () => mediaQuery.removeListener(updateMatch);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizingPatientPanel) {
-      return;
-    }
-
-    const originalCursor = document.body.style.cursor;
-    const originalUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handlePointerMove = (event: PointerEvent) => {
-      event.preventDefault();
-
-      if (!layoutRef.current) {
-        return;
-      }
-
-      const rect = layoutRef.current.getBoundingClientRect();
-      const proposedWidth = rect.right - event.clientX;
-      const clampedWidth = Math.min(
-        Math.max(proposedWidth, MIN_PATIENT_PANEL_WIDTH),
-        MAX_PATIENT_PANEL_WIDTH
-      );
-
-      setPatientPanelWidth(clampedWidth);
-    };
-
-    const handlePointerUp = () => {
-      setIsResizingPatientPanel(false);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      document.body.style.cursor = originalCursor;
-      document.body.style.userSelect = originalUserSelect;
-    };
-  }, [isResizingPatientPanel, MAX_PATIENT_PANEL_WIDTH, MIN_PATIENT_PANEL_WIDTH]);
 
 
   const handlePatientPanelResizeStart = (
@@ -329,7 +247,7 @@ export default function Home() {
               </button>
             </div>
             <button
-              onClick={togglePatientPanel}
+              onClick={() => setShowPatientPanel((prev) => !prev)}
               className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
               aria-pressed={showPatientPanel}
             >
@@ -512,10 +430,7 @@ export default function Home() {
 
       {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
-        <div
-          ref={layoutRef}
-          className="h-full flex flex-col lg:flex-row relative"
-        >
+        <div className="h-full flex flex-col lg:flex-row relative">
           <div className="flex-1 overflow-hidden border-b lg:border-b-0 border-gray-200">
             <ChatPanel
               key={sessionKey}
@@ -526,32 +441,11 @@ export default function Home() {
           </div>
           {/* Patient Records Panel */}
           {showPatientPanel && (
-            <>
-              <div
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize patient window"
-                onPointerDown={handlePatientPanelResizeStart}
-                className={`hidden lg:block cursor-col-resize w-1 shrink-0 transition-colors ${
-                  isResizingPatientPanel
-                    ? "bg-blue-400"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
-              />
-              <PatientInfoPanel
-                records={patientRecords}
-                onAddPatient={() => setIsAddPatientOpen(true)}
-                className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[480px] lg:flex-none shrink-0"
-                style={
-                  isLargeScreen
-                    ? {
-                        width: patientPanelWidth,
-                        flexBasis: patientPanelWidth,
-                      }
-                    : undefined
-                }
-              />
-            </>
+            <PatientInfoPanel
+              records={patientRecords}
+              onAddPatient={() => setIsAddPatientOpen(true)}
+              className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[420px] shrink-0"
+            />
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import type { CSSProperties } from "react";
 
 export const PATIENT_STATUS_OPTIONS = [
   "Stable",
@@ -26,6 +27,7 @@ interface PatientInfoPanelProps {
   records: PatientRecord[];
   onAddPatient: () => void;
   className?: string;
+  style?: CSSProperties;
 }
 
 const statusStyles: Record<PatientStatus, string> = {
@@ -43,6 +45,10 @@ export default function PatientInfoPanel({
   records,
   onAddPatient,
   className,
+  style,
+}: PatientInfoPanelProps) {
+  return (
+    <aside className={clsx("flex flex-col", className)} style={style}>
 }: PatientInfoPanelProps) {
   return (
     <aside className={clsx("flex flex-col", className)}>

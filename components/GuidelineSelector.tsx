@@ -8,7 +8,7 @@ interface GuidelineSelectorProps {
   guidelines: Guideline[];
   activeGuideline: Guideline | null;
   onSelect: (guideline: Guideline) => void;
-  onUpload: (guideline: Guideline) => void;
+  onUpload: (guideline: Guideline, options?: { pdfUrl?: string }) => void;
 }
 
 export default function GuidelineSelector({
@@ -43,7 +43,7 @@ export default function GuidelineSelector({
             return;
           }
           onUpload(guideline);
-        } catch (error) {
+        } catch {
           alert(
             "Error parsing guideline file. Please ensure it is valid JSON."
           );
@@ -73,7 +73,8 @@ export default function GuidelineSelector({
         }
 
         setProcessingMessage(PDF_UPLOAD_CONFIG.messages.success);
-        onUpload(data.guideline);
+        const pdfUrl = URL.createObjectURL(file);
+        onUpload(data.guideline, { pdfUrl });
 
         // Reset input
         e.target.value = "";

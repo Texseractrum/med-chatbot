@@ -541,7 +541,7 @@ export default function Home() {
               <PatientInfoPanel
                 records={patientRecords}
                 onAddPatient={() => setIsAddPatientOpen(true)}
-                className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-auto shrink-0"
+                className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[480px] lg:flex-none shrink-0"
                 style={
                   isLargeScreen
                     ? {

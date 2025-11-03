@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import { Guideline } from "@/lib/types";
+import PatientInfoPanel, {
+  PatientRecord,
+} from "@/components/PatientInfoPanel";
+import AddPatientModal from "@/components/AddPatientModal";
 
 export default function Home() {
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
@@ -15,60 +19,78 @@ export default function Home() {
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [guidelinePdfMap, setGuidelinePdfMap] = useState<
-    Record<string, string>
-  >({});
-  const pdfMapRef = useRef<Record<string, string>>({});
-  const [showPdfViewer, setShowPdfViewer] = useState(true);
-  const [pdfViewerWidth, setPdfViewerWidth] = useState(400); // Width in pixels
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [showPatientPanel, setShowPatientPanel] = useState(true);
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
+    {
+      id: "PT-204",
+      name: "Alex Morgan",
+      age: 45,
+      primaryConcern: "Type 2 Diabetes",
+      status: "Needs Attention",
+      lastUpdated: "15 May 2024",
+      clinician: "Dr. Priya Desai",
+      notes: "A1C trending upward; medication review scheduled for tomorrow.",
+    },
+    {
+      id: "PT-317",
+      name: "Jordan Lee",
+      age: 62,
+      primaryConcern: "Hypertensive Emergency",
+      status: "Critical",
+      lastUpdated: "15 May 2024",
+      clinician: "Dr. Olivia Ramirez",
+      notes:
+        "Receiving IV labetalol. Repeat vitals in 10 minutes and confirm renal panel.",
+    },
+    {
+      id: "PT-411",
+      name: "Samantha Chen",
+      age: 33,
+      primaryConcern: "Postpartum Hemorrhage",
+      status: "Active",
+      lastUpdated: "14 May 2024",
+      clinician: "Dr. Miguel Alvarez",
+      notes:
+        "Responding to uterotonics. Monitor hemoglobin and consult hematology if <7.",
+    },
+    {
+      id: "PT-522",
+      name: "Christopher Young",
+      age: 70,
+      primaryConcern: "Acute Heart Failure Exacerbation",
+      status: "Stable",
+      lastUpdated: "13 May 2024",
+      clinician: "Dr. Amina El-Sayed",
+      notes: "Diuresis effective. Plan transition to oral regimen tomorrow.",
+    },
+  ]);
 
-  useEffect(() => {
-    pdfMapRef.current = guidelinePdfMap;
-  }, [guidelinePdfMap]);
+  const formatLastUpdated = () => {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+      .format(new Date())
+      .replace(/\s/g, " ")
+      .replace(",", "");
+  };
 
-  useEffect(() => {
-    return () => {
-      Object.values(pdfMapRef.current).forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-    };
-  }, []);
+  const handlePatientSave = (record: Omit<PatientRecord, "lastUpdated">) => {
+    const lastUpdated = formatLastUpdated();
 
-  // Handle dragging for resizing PDF viewer
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const newWidth = containerRect.right - e.clientX;
-
-      // Constrain width between 250px and 80% of container width
-      const minWidth = 250;
-      const maxWidth = containerRect.width * 0.8;
-
-      setPdfViewerWidth(Math.max(minWidth, Math.min(newWidth, maxWidth)));
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isDragging]);
+    setPatientRecords((prev) => {
+      const filtered = prev.filter((existing) => existing.id !== record.id);
+      return [
+        {
+          ...record,
+          lastUpdated,
+        },
+        ...filtered,
+      ];
+    });
+  };
 
   const handleGuidelineSelect = (guideline: Guideline) => {
     setActiveGuideline(guideline);
@@ -92,14 +114,6 @@ export default function Home() {
 
     setGuidelines((prev) => prev.filter((g) => g.guideline_id !== guidelineId));
 
-    setGuidelinePdfMap((prev) => {
-      const { [guidelineId]: removedUrl, ...rest } = prev;
-      if (removedUrl) {
-        URL.revokeObjectURL(removedUrl);
-      }
-      return rest;
-    });
-
     // If the deleted guideline was active, switch to the first remaining guideline
     if (activeGuideline?.guideline_id === guidelineId) {
       const remainingGuidelines = guidelines.filter(
@@ -122,8 +136,6 @@ export default function Home() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const pdfUrl = URL.createObjectURL(file);
-
     try {
       const response = await fetch("/api/parse-pdf", {
         method: "POST",
@@ -134,7 +146,6 @@ export default function Home() {
 
       if (data.error) {
         setUploadError(data.error);
-        URL.revokeObjectURL(pdfUrl);
         setIsUploadingPdf(false);
         return;
       }
@@ -150,17 +161,6 @@ export default function Home() {
         setGuidelines((prev) => [...prev, newGuideline]);
       }
 
-      setGuidelinePdfMap((prev) => {
-        const existingUrl = prev[newGuideline.guideline_id];
-        if (existingUrl) {
-          URL.revokeObjectURL(existingUrl);
-        }
-        return {
-          ...prev,
-          [newGuideline.guideline_id]: pdfUrl,
-        };
-      });
-
       setActiveGuideline(newGuideline);
       setShowGuidelineSelector(false);
       setSessionKey((prev) => prev + 1); // Force chat to reset
@@ -171,7 +171,6 @@ export default function Home() {
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
-      URL.revokeObjectURL(pdfUrl);
       setIsUploadingPdf(false);
     }
 
@@ -241,6 +240,16 @@ export default function Home() {
                 💡 Explain
               </button>
             </div>
+            <button
+              onClick={() => setShowPatientPanel((prev) => !prev)}
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+              aria-pressed={showPatientPanel}
+            >
+              <span>🩺</span>
+              <span className="truncate">
+                {showPatientPanel ? "Hide Patient Window" : "Show Patient Window"}
+              </span>
+            </button>
           </div>
         </div>
       </header>
@@ -359,7 +368,7 @@ export default function Home() {
                         </p>
                       </div>
                       <p className="text-xs text-blue-700">
-                        Analyzing guideline structure and flowchart...
+                        Analyzing guideline structure and decision logic...
                       </p>
                     </div>
                   </>
@@ -415,10 +424,7 @@ export default function Home() {
 
       {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
-        <div
-          ref={containerRef}
-          className="h-full flex flex-col lg:flex-row relative"
-        >
+        <div className="h-full flex flex-col lg:flex-row relative">
           <div className="flex-1 overflow-hidden border-b lg:border-b-0 border-gray-200">
             <ChatPanel
               key={sessionKey}
@@ -427,67 +433,25 @@ export default function Home() {
               onModeChange={setMode}
             />
           </div>
-
-          {/* PDF Viewer Toggle Button - Always visible */}
-          <button
-            onClick={() => setShowPdfViewer(!showPdfViewer)}
-            className="absolute top-4 right-4 z-20 p-2 bg-white border border-gray-300 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
-            title={showPdfViewer ? "Hide PDF viewer" : "Show PDF viewer"}
-          >
-            <svg
-              className={`w-4 h-4 text-gray-700 transition-transform duration-300 ${
-                showPdfViewer ? "" : "rotate-180"
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </button>
-
-          {/* Draggable Divider - only show when PDF viewer is visible */}
-          {showPdfViewer && (
-            <div
-              onMouseDown={() => setIsDragging(true)}
-              className="hidden lg:block w-1 bg-gray-300 hover:bg-blue-500 cursor-ew-resize transition-colors relative group"
-              title="Drag to resize"
-            >
-              <div className="absolute inset-y-0 -left-1 -right-1" />
-            </div>
-          )}
-
-          {/* PDF Viewer Panel */}
-          {showPdfViewer && (
-            <div
-              className="relative bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full shrink-0"
-              style={{ width: `${pdfViewerWidth}px` }}
-            >
-              {/* PDF Content */}
-              {activeGuideline &&
-              guidelinePdfMap[activeGuideline.guideline_id] ? (
-                <iframe
-                  src={guidelinePdfMap[activeGuideline.guideline_id]}
-                  className="w-full h-full border-0"
-                  title={`${activeGuideline.name} flowchart`}
-                  style={{ pointerEvents: isDragging ? "none" : "auto" }}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center px-6 text-center text-sm text-gray-500">
-                  {activeGuideline
-                    ? "Upload a PDF flowchart to preview it here."
-                    : "Select a guideline to view its flowchart."}
-                </div>
-              )}
-            </div>
+          {/* Patient Records Panel */}
+          {showPatientPanel && (
+            <PatientInfoPanel
+              records={patientRecords}
+              onAddPatient={() => setIsAddPatientOpen(true)}
+              className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[420px] shrink-0"
+            />
           )}
         </div>
       </div>
-    </div>
-  );
+      {isAddPatientOpen && (
+        <AddPatientModal
+          onClose={() => setIsAddPatientOpen(false)}
+          onSave={(patient) => {
+            setShowPatientPanel(true);
+            handlePatientSave(patient);
+          }}
+        />
+      )}
+      </div>
+    );
 }

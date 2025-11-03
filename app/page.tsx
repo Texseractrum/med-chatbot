@@ -16,11 +16,14 @@ import PatientInfoPanel, {
 } from "@/components/PatientInfoPanel";
 import { Guideline } from "@/lib/types";
 
-type GuidelineInputValue = string | number | boolean | "";
-
 const MIN_PATIENT_PANEL_WIDTH = 360;
 const MAX_PATIENT_PANEL_WIDTH = 640;
 const INITIAL_PATIENT_PANEL_WIDTH = 500;
+const MIN_PDF_VIEWER_WIDTH = 280;
+const MAX_PDF_VIEWER_WIDTH = 600;
+const INITIAL_PDF_VIEWER_WIDTH = 380;
+
+type GuidelineInputValue = string | number | boolean | "";
 
 export default function Home() {
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
@@ -41,7 +44,15 @@ export default function Home() {
   );
   const [isResizingPatientPanel, setIsResizingPatientPanel] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [pdfViewerWidth, setPdfViewerWidth] = useState(INITIAL_PDF_VIEWER_WIDTH);
+  const [isResizingPdfViewer, setIsResizingPdfViewer] = useState(false);
+  const [guidelinePdfMap, setGuidelinePdfMap] = useState<
+    Record<string, string>
+  >({});
   const layoutRef = useRef<HTMLDivElement>(null);
+  const pdfLayoutRef = useRef<HTMLDivElement>(null);
+  const pdfMapRef = useRef<Record<string, string>>({});
 
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
     {
@@ -105,7 +116,8 @@ export default function Home() {
     }
 
     const storedValues =
-      guidelineInputs[activeGuideline.guideline_id] || ({} as Record<string, GuidelineInputValue>);
+      guidelineInputs[activeGuideline.guideline_id] ||
+      ({} as Record<string, GuidelineInputValue>);
 
     const next: Record<string, GuidelineInputValue> = {};
     for (const input of activeGuideline.inputs) {
@@ -191,6 +203,59 @@ export default function Home() {
     };
   }, [isResizingPatientPanel]);
 
+  useEffect(() => {
+    if (!isResizingPdfViewer) {
+      return;
+    }
+
+    const originalCursor = document.body.style.cursor;
+    const originalUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (event: PointerEvent) => {
+      event.preventDefault();
+      if (!pdfLayoutRef.current) {
+        return;
+      }
+
+      const rect = pdfLayoutRef.current.getBoundingClientRect();
+      const proposedWidth = rect.right - event.clientX;
+      const maxWidth = Math.min(MAX_PDF_VIEWER_WIDTH, rect.width * 0.8);
+      const clampedWidth = Math.min(
+        Math.max(proposedWidth, MIN_PDF_VIEWER_WIDTH),
+        maxWidth
+      );
+      setPdfViewerWidth(clampedWidth);
+    };
+
+    const handlePointerUp = () => {
+      setIsResizingPdfViewer(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      document.body.style.cursor = originalCursor;
+      document.body.style.userSelect = originalUserSelect;
+    };
+  }, [isResizingPdfViewer]);
+
+  useEffect(() => {
+    pdfMapRef.current = guidelinePdfMap;
+  }, [guidelinePdfMap]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of Object.values(pdfMapRef.current)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, []);
+
   const formatLastUpdated = () => {
     return new Intl.DateTimeFormat("en-GB", {
       day: "2-digit",
@@ -222,9 +287,15 @@ export default function Home() {
     setActiveGuidelineId(guideline.guideline_id);
     setIsGuidelineSelectorOpen(false);
     setSessionKey((value) => value + 1);
+    setShowPdfViewer((current) =>
+      current || Boolean(guidelinePdfMap[guideline.guideline_id])
+    );
   };
 
-  const handleGuidelineUpload = (guideline: Guideline) => {
+  const handleGuidelineUpload = (
+    guideline: Guideline,
+    options?: { pdfUrl?: string }
+  ) => {
     setGuidelines((previous) => {
       const existingIndex = previous.findIndex(
         (item) => item.guideline_id === guideline.guideline_id
@@ -236,6 +307,20 @@ export default function Home() {
       next[existingIndex] = guideline;
       return next;
     });
+
+    if (options?.pdfUrl) {
+      setGuidelinePdfMap((previous) => {
+        const next = { ...previous };
+        const existing = next[guideline.guideline_id];
+        if (existing && existing !== options.pdfUrl) {
+          URL.revokeObjectURL(existing);
+        }
+        next[guideline.guideline_id] = options.pdfUrl;
+        return next;
+      });
+      setShowPdfViewer(true);
+    }
+
     setActiveGuidelineId(guideline.guideline_id);
     setIsGuidelineSelectorOpen(false);
     setSessionKey((value) => value + 1);
@@ -251,11 +336,28 @@ export default function Home() {
     setIsResizingPatientPanel(true);
   };
 
+  const handlePdfPanelResizeStart = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (!isLargeScreen) {
+      return;
+    }
+    event.preventDefault();
+    setIsResizingPdfViewer(true);
+  };
+
   const togglePatientPanel = () => {
     if (isResizingPatientPanel) {
       setIsResizingPatientPanel(false);
     }
     setShowPatientPanel((previous) => !previous);
+  };
+
+  const togglePdfViewer = () => {
+    if (isResizingPdfViewer) {
+      setIsResizingPdfViewer(false);
+    }
+    setShowPdfViewer((previous) => !previous);
   };
 
   return (
@@ -310,6 +412,16 @@ export default function Home() {
               </button>
             </div>
             <button
+              onClick={togglePdfViewer}
+              className="flex items-center justify-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 hover:shadow"
+              aria-pressed={showPdfViewer}
+            >
+              <span>📄</span>
+              <span className="truncate">
+                {showPdfViewer ? "Hide Flowchart" : "Show Flowchart"}
+              </span>
+            </button>
+            <button
               onClick={togglePatientPanel}
               className="flex items-center justify-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 hover:shadow"
               aria-pressed={showPatientPanel}
@@ -345,39 +457,83 @@ export default function Home() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden">
-          <div
-            ref={layoutRef}
-            className="flex h-full flex-col lg:flex-row"
-          >
-            <div className="flex-1 overflow-y-auto border-b border-gray-200 bg-gray-50 px-4 py-6 sm:px-6 md:px-8 lg:border-b-0">
-              {activeGuideline ? (
-                <div className="grid h-full gap-6 lg:grid-cols-[minmax(0,360px),1fr]">
-                  <GuidelineForm
-                    guideline={activeGuideline}
-                    values={activeGuidelineValues}
-                    onChange={handleGuidelineInputChange}
-                  />
-                  <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                    <ChatPanel
-                      key={sessionKey}
+          <div ref={layoutRef} className="flex h-full flex-col lg:flex-row">
+            <div
+              ref={pdfLayoutRef}
+              className="flex flex-1 flex-col lg:flex-row"
+            >
+              <div className="flex-1 overflow-y-auto border-b border-gray-200 bg-gray-50 px-4 py-6 sm:px-6 md:px-8 lg:border-b-0">
+                {activeGuideline ? (
+                  <div className="grid h-full gap-6 lg:grid-cols-[minmax(0,360px),1fr]">
+                    <GuidelineForm
                       guideline={activeGuideline}
-                      mode={mode}
-                      onModeChange={setMode}
+                      values={activeGuidelineValues}
+                      onChange={handleGuidelineInputChange}
                     />
+                    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                      <ChatPanel
+                        key={sessionKey}
+                        guideline={activeGuideline}
+                        mode={mode}
+                        onModeChange={setMode}
+                      />
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/70 p-6 text-center">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      Upload or select a guideline to start a session.
-                    </p>
-                    <p className="mt-2 text-sm text-gray-500">
-                      The assistant will tailor recommendations once a guideline
-                      is active.
-                    </p>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/70 p-6 text-center">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">
+                        Upload or select a guideline to start a session.
+                      </p>
+                      <p className="mt-2 text-sm text-gray-500">
+                        The assistant will tailor recommendations once a guideline is active.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
+
+              {showPdfViewer && (
+                <>
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize flowchart viewer"
+                    onPointerDown={handlePdfPanelResizeStart}
+                    className={`hidden w-1 shrink-0 lg:block ${
+                      isResizingPdfViewer
+                        ? "bg-blue-400"
+                        : "cursor-col-resize bg-gray-200 hover:bg-gray-300"
+                    }`}
+                  />
+                  <div
+                    className="h-80 w-full shrink-0 border-t border-gray-200 bg-white lg:h-full lg:border-l lg:border-t-0"
+                    style={
+                      isLargeScreen
+                        ? {
+                            width: pdfViewerWidth,
+                            flexBasis: pdfViewerWidth,
+                          }
+                        : undefined
+                    }
+                  >
+                    {activeGuideline &&
+                    guidelinePdfMap[activeGuideline.guideline_id] ? (
+                      <iframe
+                        src={guidelinePdfMap[activeGuideline.guideline_id]}
+                        className="h-full w-full border-0"
+                        title={`${activeGuideline.name} flowchart`}
+                        style={{ pointerEvents: isResizingPdfViewer ? "none" : "auto" }}
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-6 text-center text-sm text-gray-500">
+                        {activeGuideline
+                          ? "Upload a PDF flowchart to preview it here."
+                          : "Select a guideline to view its flowchart."}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 

@@ -49,6 +49,9 @@ export default function PatientInfoPanel({
 }: PatientInfoPanelProps) {
   return (
     <aside className={clsx("flex flex-col", className)} style={style}>
+}: PatientInfoPanelProps) {
+  return (
+    <aside className={clsx("flex flex-col", className)}>
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -7,6 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useState, useRef } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import GuidelineForm from "@/components/GuidelineForm";
 import GuidelineSelector from "@/components/GuidelineSelector";
@@ -15,6 +16,10 @@ import PatientInfoPanel, {
   type PatientRecord,
 } from "@/components/PatientInfoPanel";
 import { Guideline } from "@/lib/types";
+import PatientInfoPanel, {
+  PatientRecord,
+} from "@/components/PatientInfoPanel";
+import AddPatientModal from "@/components/AddPatientModal";
 
 const MIN_PATIENT_PANEL_WIDTH = 360;
 const MAX_PATIENT_PANEL_WIDTH = 640;
@@ -54,6 +59,13 @@ export default function Home() {
   const pdfLayoutRef = useRef<HTMLDivElement>(null);
   const pdfMapRef = useRef<Record<string, string>>({});
 
+  const [showGuidelineSelector, setShowGuidelineSelector] = useState(true); // Show by default
+  const [sessionKey, setSessionKey] = useState(0); // Used to reset chat when guideline changes
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPatientPanel, setShowPatientPanel] = useState(true);
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
     {
       id: "PT-204",
@@ -202,6 +214,47 @@ export default function Home() {
       document.body.style.userSelect = originalUserSelect;
     };
   }, [isResizingPatientPanel]);
+  const formatLastUpdated = () => {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+      .format(new Date())
+      .replace(/\s/g, " ")
+      .replace(",", "");
+  };
+
+  const handlePatientSave = (record: Omit<PatientRecord, "lastUpdated">) => {
+    const lastUpdated = formatLastUpdated();
+
+    setPatientRecords((prev) => {
+      const filtered = prev.filter((existing) => existing.id !== record.id);
+      return [
+        {
+          ...record,
+          lastUpdated,
+        },
+        ...filtered,
+      ];
+    });
+  };
+
+  const handleGuidelineSelect = (guideline: Guideline) => {
+    setActiveGuideline(guideline);
+    setShowGuidelineSelector(false);
+    setSessionKey((prev) => prev + 1); // Force chat to reset
+  };
+
+  const handleGuidelineDelete = (guidelineId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the guideline when clicking delete
+
+    if (guidelines.length === 1) {
+      alert(
+        "You cannot delete the last guideline. At least one guideline must be available."
+      );
+      return;
+    }
 
   useEffect(() => {
     if (!isResizingPdfViewer) {
@@ -225,6 +278,10 @@ export default function Home() {
       const clampedWidth = Math.min(
         Math.max(proposedWidth, MIN_PDF_VIEWER_WIDTH),
         maxWidth
+    // If the deleted guideline was active, switch to the first remaining guideline
+    if (activeGuideline?.guideline_id === guidelineId) {
+      const remainingGuidelines = guidelines.filter(
+        (g) => g.guideline_id !== guidelineId
       );
       setPdfViewerWidth(clampedWidth);
     };
@@ -255,6 +312,11 @@ export default function Home() {
       }
     };
   }, []);
+    try {
+      const response = await fetch("/api/parse-pdf", {
+        method: "POST",
+        body: formData,
+      });
 
   const formatLastUpdated = () => {
     return new Intl.DateTimeFormat("en-GB", {
@@ -282,6 +344,11 @@ export default function Home() {
       ];
     });
   };
+      if (data.error) {
+        setUploadError(data.error);
+        setIsUploadingPdf(false);
+        return;
+      }
 
   const handleGuidelineSelect = (guideline: Guideline) => {
     setActiveGuidelineId(guideline.guideline_id);
@@ -341,6 +408,17 @@ export default function Home() {
   ) => {
     if (!isLargeScreen) {
       return;
+      setActiveGuideline(newGuideline);
+      setShowGuidelineSelector(false);
+      setSessionKey((prev) => prev + 1); // Force chat to reset
+      setIsUploadingPdf(false);
+    } catch (error) {
+      setUploadError(
+        `Failed to upload guideline: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      setIsUploadingPdf(false);
     }
     event.preventDefault();
     setIsResizingPdfViewer(true);
@@ -424,6 +502,8 @@ export default function Home() {
             <button
               onClick={togglePatientPanel}
               className="flex items-center justify-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 hover:shadow"
+              onClick={() => setShowPatientPanel((prev) => !prev)}
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-lg bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-300 transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
               aria-pressed={showPatientPanel}
             >
               <span>🩺</span>
@@ -477,6 +557,122 @@ export default function Home() {
                         mode={mode}
                         onModeChange={setMode}
                       />
+      {/* Guideline Selector Dropdown */}
+      {showGuidelineSelector && (
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-6 shadow-md">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Select or Upload a Guideline
+              </h3>
+              <button
+                onClick={() => setShowGuidelineSelector(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {guidelines.map((guideline) => (
+                <div
+                  key={guideline.guideline_id}
+                  className={`relative group rounded-lg border-2 transition-all ${
+                    activeGuideline?.guideline_id === guideline.guideline_id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300 bg-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => handleGuidelineSelect(guideline)}
+                    className="w-full text-left p-3"
+                  >
+                    <p className="text-xs font-semibold text-gray-900 pr-8">
+                      {guideline.name}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {guideline.guideline_id} • {guideline.version}
+                    </p>
+                  </button>
+                  {guidelines.length > 1 && (
+                    <button
+                      onClick={(e) =>
+                        handleGuidelineDelete(guideline.guideline_id, e)
+                      }
+                      className="absolute top-2 right-2 p-1 rounded-md bg-red-100 text-red-600 opacity-0 group-hover:opacity-100 hover:bg-red-200 transition-opacity"
+                      title="Delete guideline"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPdf}
+                className={`text-left p-4 rounded-lg border-2 border-dashed transition-all relative overflow-hidden ${
+                  isUploadingPdf
+                    ? "border-blue-400 bg-blue-100 cursor-not-allowed"
+                    : activeGuideline
+                    ? "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                    : "border-blue-400 bg-blue-50 hover:border-blue-500 hover:bg-blue-100 animate-pulse"
+                }`}
+              >
+                {isUploadingPdf ? (
+                  <>
+                    <div className="absolute inset-0 bg-blue-200 opacity-50 animate-pulse"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg
+                          className="animate-spin h-5 w-5 text-blue-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        <p className="text-xs font-semibold text-blue-900">
+                          Processing PDF...
+                        </p>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Analyzing guideline structure and decision logic...
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -569,6 +765,27 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Main Chat Interface */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full flex flex-col lg:flex-row relative">
+          <div className="flex-1 overflow-hidden border-b lg:border-b-0 border-gray-200">
+            <ChatPanel
+              key={sessionKey}
+              guideline={activeGuideline}
+              mode={mode}
+              onModeChange={setMode}
+            />
+          </div>
+          {/* Patient Records Panel */}
+          {showPatientPanel && (
+            <PatientInfoPanel
+              records={patientRecords}
+              onAddPatient={() => setIsAddPatientOpen(true)}
+              className="bg-white border-t lg:border-t-0 lg:border-l border-gray-200 h-80 lg:h-full w-full lg:w-[420px] shrink-0"
+            />
+          )}
+        </div>
+      </div>
       {isAddPatientOpen && (
         <AddPatientModal
           onClose={() => setIsAddPatientOpen(false)}
@@ -580,4 +797,6 @@ export default function Home() {
       )}
     </div>
   );
+      </div>
+    );
 }

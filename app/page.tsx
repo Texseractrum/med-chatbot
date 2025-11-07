@@ -93,10 +93,16 @@ export default function Home() {
     });
   };
 
-  const handleGuidelineSelect = (guideline: Guideline) => {
-    setActiveGuideline(guideline);
-    setShowGuidelineSelector(false);
-    setSessionKey((prev) => prev + 1); // Force chat to reset
+
+  const handlePatientPanelResizeStart = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (!isLargeScreen) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsResizingPatientPanel(true);
   };
 
   const handleGuidelineDelete = (guidelineId: string, e: React.MouseEvent) => {

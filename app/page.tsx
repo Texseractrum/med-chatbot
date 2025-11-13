@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ChatPanel from "@/components/ChatPanel";
-import { Guideline } from "@/lib/types";
+import { AnyGuideline, NICEGuideline } from "@/lib/types";
 import PatientInfoPanel, {
   PatientRecord,
 } from "@/components/PatientInfoPanel";
 import AddPatientModal from "@/components/AddPatientModal";
 import ResizablePanel from "@/components/ResizablePanel";
+import GuidelineViewer from "@/components/GuidelineViewer";
+import { niceHypertensionGuideline } from "@/lib/guidelines/nice-hypertension";
+import { Eye } from "lucide-react";
+
+// Type guard to check if guideline is NICE format
+function isNICEGuideline(guideline: AnyGuideline): guideline is NICEGuideline {
+  return 'rules' in guideline && 'edges' in guideline;
+}
 
 export default function Home() {
-  const [guidelines, setGuidelines] = useState<Guideline[]>([]);
-  const [activeGuideline, setActiveGuideline] = useState<Guideline | null>(
+  const [guidelines, setGuidelines] = useState<AnyGuideline[]>([]);
+  const [activeGuideline, setActiveGuideline] = useState<AnyGuideline | null>(
     null
   );
   const [mode, setMode] = useState<"strict" | "explain">("explain");
@@ -22,6 +30,13 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPatientPanel, setShowPatientPanel] = useState(true);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [viewerGuideline, setViewerGuideline] = useState<NICEGuideline | null>(null);
+
+  // Load default guideline on mount
+  useEffect(() => {
+    setGuidelines([niceHypertensionGuideline]);
+    setActiveGuideline(niceHypertensionGuideline);
+  }, []);
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>([
     {
       id: "PT-204",
@@ -93,7 +108,7 @@ export default function Home() {
     });
   };
 
-  const handleGuidelineSelect = (guideline: Guideline) => {
+  const handleGuidelineSelect = (guideline: AnyGuideline) => {
     setActiveGuideline(guideline);
     setShowGuidelineSelector(false);
     setSessionKey((prev) => prev + 1); // Force chat to reset
@@ -151,7 +166,7 @@ export default function Home() {
         return;
       }
 
-      const newGuideline: Guideline = data.guideline;
+      const newGuideline: AnyGuideline = data.guideline;
 
       // Check if guideline already exists
       const exists = guidelines.some(
@@ -303,6 +318,18 @@ export default function Home() {
                       {guideline.guideline_id} • {guideline.version}
                     </p>
                   </button>
+                  {isNICEGuideline(guideline) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewerGuideline(guideline);
+                      }}
+                      className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                    >
+                      <Eye className="w-3 h-3" />
+                      View
+                    </button>
+                  )}
                   {guidelines.length > 1 && (
                     <button
                       onClick={(e) =>
@@ -453,6 +480,12 @@ export default function Home() {
           onSave={(patient) => {
             handlePatientSave(patient);
           }}
+        />
+      )}
+      {viewerGuideline && (
+        <GuidelineViewer
+          guideline={viewerGuideline}
+          onClose={() => setViewerGuideline(null)}
         />
       )}
     </div>

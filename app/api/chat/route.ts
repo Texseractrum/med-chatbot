@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { Guideline, DecisionResult } from '@/lib/types';
+import { Guideline, DecisionResult, NICEGuideline, AnyGuideline } from '@/lib/types';
+
+// Type guard to check if guideline is NICE format
+function isNICEGuideline(guideline: AnyGuideline): guideline is NICEGuideline {
+  return 'rules' in guideline && 'edges' in guideline;
+}
 
 interface ChatRequestBody {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
-  guideline: Guideline;
+  guideline: AnyGuideline;
   decision: DecisionResult | null;
   mode: 'strict' | 'explain';
 }
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
       : buildExplainPrompt(guideline, decision);
 
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: process.env.OPENAI_MODEL || 'gpt-4o-2024-08-06',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages
@@ -134,7 +139,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function buildStrictPrompt(guideline: Guideline, decision: DecisionResult | null): string {
+function buildStrictPrompt(guideline: AnyGuideline, decision: DecisionResult | null): string {
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -142,7 +147,39 @@ function buildStrictPrompt(guideline: Guideline, decision: DecisionResult | null
     day: 'numeric' 
   });
   
-  // Format the flowchart structure for the AI (hidden from user)
+  // Check if this is a NICE guideline format
+  if (isNICEGuideline(guideline)) {
+    // NICE Format - use rules
+    const rulesList = guideline.rules.map((rule, idx) => `  ${idx + 1}. ${rule}`).join('\n');
+    
+    return `You are a clinical decision support assistant that STRICTLY follows NICE guidelines.
+
+TODAY'S DATE: ${today}
+
+GUIDELINE: ${guideline.name} (${guideline.version})
+SOURCE: ${guideline.citation}
+URL: ${guideline.citation_url}
+
+CLINICAL DECISION RULES (YOU MUST FOLLOW THESE EXACTLY):
+${rulesList}
+
+${decision ? `CURRENT STATE: Decision reached - ${decision.action.text}` : 'CURRENT STATE: Ready to assess patient'}
+
+STRICT INSTRUCTIONS:
+1. If user's first message is "START_CONVERSATION", greet them and ask for the FIRST piece of information needed to apply the rules.
+
+2. Ask ONE question at a time to gather information needed for the IF-THEN rules above.
+
+3. Apply the rules EXACTLY as written - do not deviate or interpret.
+
+4. When you have enough information to apply a rule, state the recommendation clearly with the rule that applies.
+
+5. Always cite: "This is based on ${guideline.citation}"
+
+6. Be professional, brief, and stick strictly to the guidelines.`;
+  }
+  
+  // Legacy Format - use inputs and decision tree
   const inputsList = guideline.inputs.map(input => 
     `  - ${input.id}: "${input.label}" (${input.type}${input.unit ? ', unit: ' + input.unit : ''})`
   ).join('\n');
@@ -224,7 +261,7 @@ CONVERSATIONAL INSTRUCTIONS:
 Remember: Be helpful, professional, and conversational. Guide the user naturally without exposing the technical decision tree mechanics. Always base your questions on the actual Required Inputs defined for THIS specific guideline.`;
 }
 
-function buildExplainPrompt(guideline: Guideline, decision: DecisionResult | null): string {
+function buildExplainPrompt(guideline: AnyGuideline, decision: DecisionResult | null): string {
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -232,7 +269,59 @@ function buildExplainPrompt(guideline: Guideline, decision: DecisionResult | nul
     day: 'numeric' 
   });
   
-  // Format the flowchart structure for the AI (hidden from user)
+  // Check if this is a NICE guideline format
+  if (isNICEGuideline(guideline)) {
+    // NICE Format - use rules and graph structure
+    const rulesList = guideline.rules.map((rule, idx) => `  ${idx + 1}. ${rule}`).join('\n');
+    
+    const nodesList = guideline.nodes.map(node => 
+      `  - ${node.id} (${node.type}): ${node.text}`
+    ).join('\n');
+    
+    const edgesList = guideline.edges.map(edge => 
+      `  - ${edge.from} → ${edge.to}${edge.label ? ` [${edge.label}]` : ''}`
+    ).join('\n');
+    
+    return `You are a friendly and professional clinical decision support assistant based on NICE guidelines.
+
+TODAY'S DATE: ${today}
+
+GUIDELINE INFORMATION:
+- Name: ${guideline.name} (${guideline.version})
+- Source: ${guideline.citation}
+- URL: ${guideline.citation_url}
+
+CLINICAL DECISION RULES (Follow these strictly):
+${rulesList}
+
+DECISION GRAPH STRUCTURE (for your reference):
+Nodes:
+${nodesList}
+
+Edges (pathways):
+${edgesList}
+
+${decision ? `CURRENT STATE: Decision reached with recommendation: ${decision.action.text}` : 'CURRENT STATE: Ready to help with clinical decision-making'}
+
+INSTRUCTIONS:
+1. If user's first message is "START_CONVERSATION", greet them warmly and explain you'll help them navigate ${guideline.name} guidelines.
+
+2. Ask questions naturally to gather information needed to apply the IF-THEN rules above.
+
+3. Follow the clinical logic in the rules strictly - do not deviate from NICE recommendations.
+
+4. When providing recommendations:
+   - Present the recommendation clearly
+   - Explain the clinical reasoning based on the rules
+   - If urgent, use "⚠️ URGENT: " prefix
+   - End with: "This recommendation is based on ${guideline.citation}"
+
+5. Be conversational but always stay true to the NICE guideline rules defined above.
+
+Remember: You MUST follow the IF-THEN rules exactly as written. These are NICE guidelines and must be applied precisely.`;
+  }
+  
+  // Legacy Format - use inputs and decision tree
   const inputsList = guideline.inputs.map(input => 
     `  - ${input.id}: "${input.label}" (${input.type}${input.unit ? ', unit: ' + input.unit : ''})`
   ).join('\n');

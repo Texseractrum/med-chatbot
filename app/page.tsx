@@ -108,7 +108,7 @@ export default function Home() {
     });
   };
 
-  const handleGuidelineSelect = (guideline: Guideline) => {
+  const handleGuidelineSelect = (guideline: AnyGuideline) => {
     setActiveGuideline(guideline);
     setShowGuidelineSelector(false);
     setSessionKey((prev) => prev + 1); // Force chat to reset
@@ -166,7 +166,7 @@ export default function Home() {
         return;
       }
 
-      const newGuideline: Guideline = data.guideline;
+      const newGuideline: AnyGuideline = data.guideline;
 
       // Check if guideline already exists
       const exists = guidelines.some(

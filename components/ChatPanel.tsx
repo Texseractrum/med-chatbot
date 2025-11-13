@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChatMessage, Guideline } from "@/lib/types";
+import { ChatMessage, AnyGuideline } from "@/lib/types";
 import {
   Conversation,
   ConversationContent,
@@ -25,7 +25,7 @@ import { Loader } from "@/components/ui/shadcn-io/ai/loader";
 import { PlusIcon } from "lucide-react";
 
 interface ChatPanelProps {
-  guideline: Guideline | null;
+  guideline: AnyGuideline | null;
   mode: "strict" | "explain";
   onModeChange: (mode: "strict" | "explain") => void;
 }

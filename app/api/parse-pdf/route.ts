@@ -16,7 +16,7 @@ function getOpenAIClient() {
   });
 }
 
-// Define the Zod schema for medical guideline structure
+// Define the Zod schema for NICE guideline structure with IF-THEN rules and decision graph
 // Note: All fields must be required for OpenAI structured outputs
 const GuidelineSchema = z.object({
   guideline_id: z.string(),
@@ -24,34 +24,19 @@ const GuidelineSchema = z.object({
   version: z.string(),
   citation: z.string(),
   citation_url: z.string(),
-  inputs: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-      type: z.enum(['number', 'boolean', 'text']),
-      unit: z.string(), // Required - use empty string if not applicable
-    })
-  ),
+  rules: z.array(z.string()), // Array of IF-THEN rule strings
   nodes: z.array(
     z.object({
       id: z.string(),
-      if: z.string(),
-      then: z.string(), // Required - use empty string if terminal node
-      else: z.string(), // Required - use empty string if terminal node
-      then_action: z.object({
-        level: z.enum(['info', 'advice', 'start', 'urgent']),
-        text: z.string(),
-      }),
-      else_action: z.object({
-        level: z.enum(['info', 'advice', 'start', 'urgent']),
-        text: z.string(),
-      }),
-      notes: z.array(
-        z.object({
-          if: z.string(),
-          text: z.string(),
-        })
-      ), // Required - use empty array if no notes
+      type: z.enum(['condition', 'action']),
+      text: z.string(),
+    })
+  ),
+  edges: z.array(
+    z.object({
+      from: z.string(),
+      to: z.string(),
+      label: z.string(), // Required - use empty string if no label needed
     })
   ),
 });
